@@ -1,0 +1,444 @@
+MODULE main
+
+VAR
+  -- configurations
+  CVM: {off, on} ;
+  COFFEE: {idle, busy} ;
+  MONEY: {empty, notempty} ;
+  -- events
+  power-on: boolean;
+  power-off: boolean;
+  coffee: boolean;
+  done: boolean;
+  inc: boolean;
+  change: boolean;
+  -- local events
+  dec: boolean;
+  refund: boolean;
+  -- output events
+  light-on: boolean;
+  light-off: boolean;
+  start: boolean;
+  stop: boolean;
+  -- variables
+  m: 0..11;
+  -- explicit transitions
+  t1: boolean;
+  t2: boolean;
+  t3: boolean;
+  t4: boolean;
+  t5: boolean;
+  t6: boolean;
+  t7: boolean;
+  t8: boolean;
+  t9: boolean;
+  t10: boolean;
+  -- implicit transitions (for test generation purposes)
+  it1: boolean;
+  it2: boolean;
+  it3: boolean;
+  it4: boolean;
+  it5: boolean;
+  it6: boolean;
+  it7: boolean;
+  it8: boolean;
+  it9: boolean;
+  it10: boolean;
+  it11: boolean;
+  it12: boolean;
+
+DEFINE
+  -- in(state)
+  in-cvm := TRUE;
+  in-off:= in-cvm & CVM=off;
+  in-on := in-cvm & CVM=on;
+  in-coffee := in-on;
+  in-idle := in-coffee & COFFEE=idle;
+  in-busy := in-coffee & COFFEE=busy;
+  in-money := in-on;
+  in-empty := in-money & MONEY=empty;
+  in-notempty := in-money & MONEY=notempty;
+  -- mayoccur(t)
+  mayoccur-t1 := in-off & TRUE & power-on;
+  mayoccur-t2 := in-on & TRUE & power-off;
+  mayoccur-t3 := in-idle & m > 0 & coffee;
+  mayoccur-t4 := in-busy & TRUE & done;
+  mayoccur-t5 := in-empty & TRUE & inc;
+  mayoccur-t6 := in-notempty & m < 5 & inc;
+  mayoccur-t7 := in-notempty & m > 1 & dec;
+  mayoccur-t8 := in-notempty & m = 1 & dec;
+  mayoccur-t9 := in-idle & change;
+  mayoccur-t10 := in-notempty & refund;
+  mayoccur := mayoccur-t1 | mayoccur-t2 |
+    mayoccur-t3 | mayoccur-t4 | mayoccur-t5 | mayoccur-t6 |
+    mayoccur-t7 | mayoccur-t8 | mayoccur-t9 | mayoccur-t10;
+  -- enabled(t)
+  -- (a transition is enabled iff it may occur no outer transition may occur)
+  enabled-t1 := mayoccur-t1;
+  enabled-t2 := mayoccur-t2;
+  enabled-t3 := mayoccur-t3 & !(mayoccur-t2);
+  enabled-t4 := mayoccur-t4 & !(mayoccur-t2);
+  enabled-t5 := mayoccur-t5 & !(mayoccur-t2);
+  enabled-t6 := mayoccur-t6 & !(mayoccur-t2);
+  enabled-t7 := mayoccur-t7 & !(mayoccur-t2);
+  enabled-t8 := mayoccur-t8 & !(mayoccur-t2);
+  enabled-t9 := mayoccur-t9 & !(mayoccur-t2);
+  enabled-t10 := mayoccur-t10 & !(mayoccur-t2);
+  -- allow(input)
+  -- (this predicate determines which states may each input)
+  allow-power-on := in-cvm;
+  allow-power-off := in-cvm;
+  allow-coffee := in-on;
+  allow-done := in-on;
+  allow-inc := in-on;
+  allow-change := in-on;
+  -- when 
+  stable := !(power-on | power-off | coffee |
+    done | inc | change | dec | refund |
+    mayoccur);
+  -- def-m = transitions that define 'm'
+  def-m := t1 | t5 | t6 | t7 | t8 | t10;
+  -- cuse-m = transitions that read 'm'
+  cuse-m := t6 | t7;
+  -- puse-m = transitions that predicate on 'm'
+  puse-m := t3 | t6 | t7 | t8 | it7 | it10 | it12;
+  -- use
+  use-m := cuse-m | puse-m;
+  -- counts number of inputs (for use when simulating)
+  input-count := count(power-on, power-off, coffee, done, inc, change);
+
+ASSIGN
+  -- INIT
+  -- configurations
+  init(CVM) := off;
+  init(COFFEE) := idle;
+  init(MONEY) := empty;
+  -- input events
+  init(power-on) := FALSE;
+  init(power-off) := FALSE;
+  init(coffee) := FALSE;
+  init(done) := FALSE;
+  init(inc) := FALSE;
+  init(change) := FALSE;
+  -- local/output events
+  init(dec) := FALSE;
+  init(refund) := FALSE;
+  init(light-on) := FALSE;
+  init(light-off) := FALSE;
+  init(start) := FALSE;
+  init(stop) := FALSE;
+  -- variables
+  init(m) := 0;
+  -- explicit transitions
+  init(t1) := FALSE;
+  init(t2) := FALSE;
+  init(t3) := FALSE;
+  init(t4) := FALSE;
+  init(t5) := FALSE;
+  init(t6) := FALSE;
+  init(t7) := FALSE;
+  init(t8) := FALSE;
+  init(t9) := FALSE;
+  init(t10) := FALSE;
+  -- implicit transitions
+  init(it1) := FALSE;
+  init(it2) := FALSE;
+  init(it3) := FALSE;
+  init(it4) := FALSE;
+  init(it5) := FALSE;
+  init(it6) := FALSE;
+  init(it7) := FALSE;
+  init(it8) := FALSE;
+  init(it9) := FALSE;
+  init(it10) := FALSE;
+  init(it11) := FALSE;
+  init(it12) := FALSE;
+  
+  -- NEXT
+  -- state transitions
+  next(CVM) := case
+                 next(t1): on;
+                 next(t2): off;
+                 TRUE: CVM;
+               esac;
+  -- Note that t2 (power-off) leave COFFEE/MOENY in their last state
+  next(COFFEE) := case
+                    next(t1): idle;
+                    next(t3): busy;
+                    next(t4): idle;
+                    next(t9): idle;
+                    TRUE: COFFEE;
+                  esac;
+  next(MONEY) := case
+                   next(t1): empty;
+                   next(t5): notempty;
+                   next(t6): notempty;
+                   next(t7): notempty;
+                   next(t8): empty;
+                   next(t10): empty;
+                   TRUE: MONEY;
+                 esac;
+  -- input events
+  -- (when stable (no inputs & no enabled transitions) we're allowed
+  --  some input, unless disallowed by allow-XXX)
+  next(power-on) := case
+                      stable & allow-power-on : {TRUE,FALSE};
+                      TRUE: FALSE;
+                    esac;
+  next(power-off) := case
+                       stable & allow-power-off : {TRUE,FALSE};
+                       TRUE: FALSE;
+                     esac;
+  next(coffee) := case
+                    stable & allow-coffee : {TRUE,FALSE};
+                    TRUE: FALSE;
+                  esac;
+  next(done) := case
+                  stable & allow-done: {TRUE,FALSE};
+                  TRUE: FALSE;
+                esac;
+  next(inc) := case
+                 stable & allow-inc : {TRUE,FALSE};
+                 TRUE: FALSE;
+               esac;
+  next(change) := case
+                 stable & allow-change : {TRUE,FALSE};
+                 TRUE: FALSE;
+               esac;
+
+  -- local & output events
+  -- (these are generated when we take a transition with the event in the actions)
+  next(dec) := next(t3);
+  
+  -- TODO: need to make sure outputs persist until stable!
+  next(refund) := next(t9);
+  next(light-on) := next(t1);
+  next(light-off) := next(t2);
+  next(start) := next(t3);
+  next(stop) := next(t4);
+
+  -- variables
+  -- (TODO: need to detect non-determinism when more than one defining
+  --   transition enabled, currently this just chooses the first transition
+  --   which is NOT good)
+  next(m) := case
+               next(t1): 0;
+               next(t5): 1;
+               next(t6) & m < 5: m + 1;
+               next(t7) & m > 0: m - 1;
+               next(t8): 0;
+               next(t10): 0;
+               TRUE: m;
+             esac;
+  -- explicit transitions
+  -- (transitions that may compete are left free but later constrained
+  --   via TRANS to ensure exactly one transition occurs when at least one is enabled)
+  next(t1) := enabled-t1 ? TRUE : FALSE;
+  next(t2) := enabled-t2 ? TRUE : FALSE;
+  next(t3) := enabled-t3 ? {TRUE, FALSE} : FALSE;
+  next(t9) := enabled-t9 ? {TRUE, FALSE} : FALSE;
+  next(t4) := enabled-t4 ? TRUE : FALSE;
+  next(t5) := enabled-t5 ? TRUE : FALSE;
+  next(t6) := enabled-t6 ? {TRUE, FALSE} : FALSE;
+  next(t7) := enabled-t7 ? {TRUE, FALSE} : FALSE;
+  next(t8) := enabled-t8 ? {TRUE, FALSE} : FALSE;
+  next(t10) := enabled-t10 ? {TRUE, FALSE} : FALSE;
+
+  -- implicit transitions
+  -- Note: these variables are for test purposes only,
+  --   to test that invalid inputs are ignored
+  next(it1) := case
+                 in-off & TRUE & power-off=TRUE &
+                   next(in-off): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it2) := case
+                 in-off & TRUE & coffee=TRUE &
+                   next(in-off): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it3) := case
+                 in-off & TRUE & done=TRUE &
+                   next(in-off): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it4) := case
+                 in-off & TRUE & inc=TRUE &
+                   next(in-off): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it5) := case
+                 in-off & TRUE & dec=TRUE &
+                   next(in-off): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it6) := case
+                 in-on & TRUE & power-on=TRUE &
+                   next(in-on): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it7) := case
+               in-idle & !(m > 0) & coffee=TRUE &
+                 next(in-idle): TRUE;
+               TRUE: FALSE;
+             esac;
+  next(it8) := case
+                 in-busy & TRUE & coffee=TRUE &
+                   next(in-busy): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it9) := case
+                 in-idle & TRUE & done=TRUE &
+                   next(in-idle): TRUE;
+                 TRUE: FALSE;
+               esac;
+  next(it10) := case
+                  in-notempty & !(m < 10) & inc=TRUE &
+                    next(in-notempty): TRUE;
+                  TRUE: FALSE;
+                esac;
+  next(it11) := case
+                  in-empty & TRUE & dec=TRUE &
+                    next(in-empty): TRUE;
+                  TRUE: FALSE;
+                esac;
+  next(it12) := case
+                  in-notempty & m = 0 & dec=TRUE &
+                    next(in-notempty): TRUE;
+                  TRUE: FALSE;
+                esac;
+TRANS
+ -- constrain competing transitions to choose 1 transition to fire
+ ((enabled-t3 | enabled-t9) ->
+         count(next(t3),next(t9)) = 1) &
+ ((enabled-t6 | enabled-t7 | enabled-t8 | enabled-t10) -> 
+         count(next(t6),next(t7),next(t8),next(t10)) = 1)
+-- coffee must eventually be served (for checking start -> F (stop|power-off))
+FAIRNESS !in-busy
+
+-- heathiness checks
+-- 1. the statechart always eventually stablises
+LTLSPEC G (!stable -> F stable)
+-- 2. statechart can't deadlock (always take at least one transition)
+-- (Note: this doesn't mean individual states can't deadlock internally)
+SPEC AG (EF (t1 | t2 | t3 | t4 | t5 | t6 | t7 | t8 | t9 | t10))
+-- 3. no conflicts over variable updates
+LTLSPEC G (count(t1,t5,t6,t7,t8,t10) <= 1)
+-- 4. competing transitions can't both fire
+LTLSPEC G (count(t3,t9) <= 1 & count(t6,t7,t8,t10) <= 1)
+-- 5. 
+LTLSPEC G (in-off & stable -> X in-off)
+LTLSPEC G (in-on & stable -> X in-on)
+LTLSPEC G (in-idle & stable -> X in-idle)
+LTLSPEC G (in-busy & stable -> X in-busy)
+
+
+-- stable = no inputs/local events, and no enabled transitions
+
+-- 
+-- stable+outputs -> {inputs -> transition + update/local/output -> ... -> } stable+outputs
+--      ^                 |
+--      \-----------------/          
+
+
+-- CVM checks
+-- 1. have to have money to get coffee, and cvm on
+LTLSPEC G (start -> m>0 & in-on)
+-- 2. can always produce coffee
+SPEC AG ( EF stop)
+-- 3. money always <= 5, and not empty means m>0
+LTLSPEC G (m <= 5 & in-notempty -> m > 0)
+-- 4. power off always turns cvm off
+LTLSPEC G (power-off & in-on -> X in-off)
+-- 5. power on turns cvm on, and resets money
+LTLSPEC G (power-on & in-off -> X (in-on & m=0))
+-- 6. coffee eventually served or CVM powered off
+LTLSPEC G (start -> F (stop | power-off))
+-- 7. can ask for coffee and inc at same time
+SPEC EF (coffee & inc)
+
+-- 9. decrement is atomic w.r.t inputs
+-- Note: it's possible to ask for coffee and inc at the same time
+--  but at outputs, m will already have been incremented
+LTLSPEC G (start & m=1 -> F(m=0))
+LTLSPEC G (start & m=2 -> F(m=1))
+LTLSPEC G (start & m=3 -> F(m=2))
+LTLSPEC G (start & m=4 -> F(m=3))
+
+-- -- control flow oriented test coverage
+-- -- state coverage
+SPEC EF (in-off & EF stable)
+SPEC EF (in-idle & EF stable)
+-- SPEC ! EF (in-busy & EF stable)
+-- SPEC ! EF (in-empty & EF stable)
+-- SPEC ! EF (in-notempty & EF stable)
+-- -- configuration coverage
+-- SPEC ! EF (in-off & EF stable)
+-- SPEC ! EF (in-idle & in-empty & EF stable)
+-- SPEC ! EF (in-idle & in-notempty & EF stable)
+-- SPEC ! EF (in-busy & in-empty & EF stable)
+-- SPEC ! EF (in-busy & in-notempty & EF stable)
+-- -- strong transition coverage
+SPEC EF (t1 & EF stable)
+SPEC EF (t2 & EF stable)
+SPEC EF (t3 & EF stable)
+SPEC EF (t4 & EF stable)
+SPEC EF (t5 & EF stable)
+SPEC EF (t6 & EF stable)
+SPEC EF (t7 & EF stable)
+SPEC EF (t8 & EF stable)
+SPEC EF (it1 & EF stable)
+-- SPEC EF (it2 & EF stable)
+-- SPEC EF (it3 & EF stable)
+-- SPEC EF (it4 & EF stable)
+-- SPEC EF (it5 & EF stable)
+SPEC EF (it6 & EF stable)
+SPEC EF (it7 & EF stable)
+SPEC EF (it8 & EF stable)
+SPEC EF (it9 & EF stable)
+-- SPEC EF (it10 & EF stable)
+-- SPEC EF (it11 & EF stable)
+-- SPEC EF (it12 & EF stable)
+-- -- data flow oriented test coverage
+-- -- strong all-def coverage
+-- SPEC ! EF(t1 & EX E [!def-m U (use-m & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (use-m & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (use-m & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (use-m & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (use-m & EF stable)])
+-- -- strong all-use coverage
+-- SPEC ! EF(t1 & EX E [!def-m U (t3 & EF stable)])
+-- SPEC ! EF(t1 & EX E [!def-m U (t6 & EF stable)])
+-- SPEC ! EF(t1 & EX E [!def-m U (t7 & EF stable)])
+-- SPEC ! EF(t1 & EX E [!def-m U (t8 & EF stable)])
+-- SPEC ! EF(t1 & EX E [!def-m U (it7 & EF stable)])
+-- SPEC ! EF(t1 & EX E [!def-m U (it10 & EF stable)])
+-- SPEC ! EF(t1 & EX E [!def-m U (it12 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (t3 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (t6 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (t7 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (t8 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (it7 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (it10 & EF stable)])
+-- SPEC ! EF(t5 & EX E [!def-m U (it12 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (t3 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (t6 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (t7 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (t8 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (it7 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (it10 & EF stable)])
+-- SPEC ! EF(t6 & EX E [!def-m U (it12 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (t3 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (t6 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (t7 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (t8 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (it7 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (it10 & EF stable)])
+-- SPEC ! EF(t7 & EX E [!def-m U (it12 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (t3 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (t6 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (t7 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (t8 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (it7 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (it10 & EF stable)])
+-- SPEC ! EF(t8 & EX E [!def-m U (it12 & EF stable)])
